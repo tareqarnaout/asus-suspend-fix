@@ -1,0 +1,42 @@
++++
+title = 'Fixing instant wake on an ASUS Vivobook Pro 15'
+description = 'A tested Linux suspend workaround for an ASUS Vivobook Pro 15 N6506CU that wakes immediately from s2idle.'
+layout = 'single'
++++
+<p class="meta">Tested on the N6506CU with Zorin OS 18.1, Linux 7.0.0-42-generic, and firmware N6506CU.309.</p>
+
+<p class="result"><strong>What worked</strong><br>Masking ACPI event <code>0x6F</code> let the laptop stay in <code>s2idle</code> for 41 seconds and resume normally.</p>
+
+<section id="diagnosis">
+<h2>How we isolated the wake signal</h2>
+<ol>
+<li>The journal showed repeated <code>s2idle</code> attempts ending almost immediately. <code>/sys/power/pm_wakeup_irq</code> reported IRQ 9, the shared ACPI interrupt.</li>
+<li>Unplugging the external keyboard and mouse receiver and disabling embedded-controller wake did not stop the immediate wake. The SD card reader logged a resume error on one attempt, but unloading its driver did not fix the wakeups.</li>
+<li><code>deep</code> suspend left the machine unresponsive to the power button and required a forced shutdown. We returned to <code>s2idle</code>.</li>
+<li>With <code>/sys/power/pm_debug_messages</code> temporarily set to <code>1</code>, the kernel logged <code>ACPI non-EC GPE wakeup</code>. The counter at <code>/sys/firmware/acpi/interrupts/gpe6F</code> rose by more than 5,000 in two seconds while awake.</li>
+</ol>
+<p><code>0x6F</code> is the firmware's ACPI General-Purpose Event number. The mask test isolated the wake signal. The underlying reason the signal kept firing remains unknown.</p>
+</section>
+<section id="test">
+<h2>Test the mask for one suspend cycle</h2>
+<p>Save your work, confirm <code>cat /sys/power/mem_sleep</code> shows <code>[s2idle]</code>, and leave the lid open. Suspend, wait at least 20 seconds, then press the power button once if the machine is still asleep.</p>
+<pre><code>echo mask | sudo tee /sys/firmware/acpi/interrupts/gpe6F &amp;&amp;
+systemctl suspend</code></pre>
+<p>Remove the temporary mask after waking. A reboot also clears it.</p>
+<pre><code>echo unmask | sudo tee /sys/firmware/acpi/interrupts/gpe6F</code></pre>
+</section>
+<section id="persist">
+<h2>Apply the workaround at boot</h2>
+<p>On the tested GRUB setup, apply this only if the temporary test succeeds. Reboot, then test suspend again.</p>
+<pre><code>printf '%s\n' 'GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT acpi_mask_gpe=0x6F"' |
+  sudo tee /etc/default/grub.d/99-mask-gpe6f.cfg &amp;&amp;
+sudo update-grub</code></pre>
+<p>After reboot, check that <code>cat /proc/cmdline</code> contains <code>acpi_mask_gpe=0x6F</code> and that <code>cat /sys/firmware/acpi/interrupts/gpe6F</code> reports <code>masked</code>.</p>
+</section>
+<section id="undo">
+<h2>Undo the boot change</h2>
+<pre><code>sudo rm /etc/default/grub.d/99-mask-gpe6f.cfg &amp;&amp;
+sudo update-grub</code></pre>
+<p>Reboot to apply the rollback.</p>
+</section>
+<p><a href="https://github.com/torvalds/linux/blob/v7.0/drivers/acpi/sysfs.c">Linux kernel source for ACPI event masking</a></p>

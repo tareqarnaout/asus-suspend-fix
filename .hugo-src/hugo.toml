@@ -1,0 +1,26 @@
+baseURL = 'https://tareqarnaout.github.io/asus-suspend-fix/'
+locale = 'en'
+title = 'Vivobook Linux Guides'
+theme = 'PaperMod'
+disableKinds = ['taxonomy', 'term', 'sitemap']
+disableHugoGeneratorInject = true
+
+[outputs]
+home = ['HTML']
+
+[params]
+ShowCodeCopyButtons = true
+ShowShareButtons = false
+
+[[menus.main]]
+name = 'Suspend fix'
+pageRef = '/'
+weight = 10
+
+[[menus.main]]
+name = 'Battery fan fix'
+pageRef = '/fan-fix'
+weight = 20
+
+[security]
+allowContent = ["^text/html$", "^text/markdown$"]

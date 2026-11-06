@@ -1,102 +1,37 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Linux battery fan and performance profile troubleshooting for the ASUS Vivobook Pro 15.">
-<title>ASUS Vivobook Pro 15 Linux battery fan fix</title>
-<style>
-:root{color-scheme:dark;--bg:#10191d;--panel:#19272d;--text:#e9f2f3;--muted:#acc2c7;--accent:#9ce2bb}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:1rem/1.65 system-ui,sans-serif}main{width:min(48rem,calc(100% - 2.5rem));margin:auto;padding:3.5rem 0}header,section{margin-bottom:2.8rem}h1,h2{line-height:1.1;letter-spacing:-.025em}h1{font-size:clamp(2.4rem,7vw,4.2rem);margin:.55rem 0 1rem}h2{font-size:1.65rem;margin-bottom:.75rem}.tag{color:var(--accent);font:700 .82rem ui-monospace,monospace;letter-spacing:.12em}.meta,footer{color:var(--muted)}nav{display:flex;flex-wrap:wrap;gap:.4rem 1.1rem;margin:1.5rem 0}a{color:var(--accent);text-underline-offset:.2em}pre,.result{background:var(--panel);border:1px solid #3a5159;border-radius:.65rem;padding:1rem}pre{overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}code{font-family:ui-monospace,monospace;font-size:.92em}li+li{margin-top:.65rem}footer{border-top:1px solid #3a5159;padding-top:1rem}
-</style>
-<style>h1{font-size:clamp(2.2rem,6vw,3.6rem)}h2{margin-top:2.1rem}hr{border:0;border-top:1px solid #3a5159;margin:2rem 0}code{overflow-wrap:anywhere}</style>
-</head>
-<body><main>
-<nav aria-label="Related guides"><a href="../">← Suspend fix guide</a></nav>
-<p class="tag">LINUX TROUBLESHOOTING / FANS</p>
-<h1>ASUS Vivobook Pro 15 — Linux Battery Fan &amp; Performance Mode Fix</h1>
-<p class="meta">Field notes for the battery fan and performance profile issue. Package dependencies and <code>asusctl</code> commands can vary by release. The causes below describe the reported setup.</p>
-<h2>Issue Summary</h2>
-<p>When running Linux on battery power on the <strong>ASUS Vivobook Pro 15</strong>, the fans fail to spin up under heavy workloads even when the desktop power profile is set to <strong>Performance</strong>.</p>
-<h3>Reported causes</h3>
-<ol>
-<li><strong>WMI / EC Handshake Issue:</strong> Generic Linux power tools (<code>power-profiles-daemon</code> / TLP) do not always sync properly with the proprietary ASUS WMI/Embedded Controller (EC) interfaces when unplugged.</li>
-<li><strong><code>asusd</code> Default Battery Fallback:</strong> By default, <code>asusctl</code> sets the battery profile to <code>Quiet</code>, which forces the system into a low-power/silent state as soon as the charger is unplugged.</li>
-<li><strong><code>powerprofilesctl</code> Mapping Conflict:</strong> Running <code>powerprofilesctl set performance</code> while <code>asusd</code> is active triggers an inverted mapping bug that resets <code>/sys/firmware/acpi/platform_profile</code> to <code>quiet</code>.</li>
-</ol>
-<hr />
-<h2>Step 1: Install Build Dependencies &amp; <code>gettext</code> (Ubuntu / Zorin OS)</h2>
-<p>Install the required compiler packages, development headers, and <code>gettext</code> (which provides <code>msgfmt</code> needed to compile translations for <code>rog-control-center</code>):</p>
-<pre><code class="language-bash">sudo apt update
+<!doctype html><html lang=en dir=auto data-theme=auto><head><meta charset=utf-8><meta http-equiv=X-UA-Compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1,shrink-to-fit=no"><meta name=robots content="index, follow"><title>ASUS Vivobook Pro 15 — Linux Battery Fan & Performance Mode Fix | Vivobook Linux Guides</title><meta name=keywords content><meta name=description content="Linux battery fan and performance profile troubleshooting for the ASUS Vivobook Pro 15."><meta name=author content><link rel=canonical href=https://tareqarnaout.github.io/asus-suspend-fix/fan-fix/><link crossorigin=anonymous href=/asus-suspend-fix/assets/css/stylesheet.95ae6e9689bd0037456375629f411acbf8ed76e0e9a7599900ad281f9526dee6.css integrity="sha256-la5ulom9ADdFY3Vin0Eay/jtduDpp1mZAK0oH5Um3uY=" rel="preload stylesheet" as=style><link rel=icon href=https://tareqarnaout.github.io/asus-suspend-fix/favicon.ico><link rel=icon type=image/png sizes=16x16 href=https://tareqarnaout.github.io/asus-suspend-fix/favicon-16x16.png><link rel=icon type=image/png sizes=32x32 href=https://tareqarnaout.github.io/asus-suspend-fix/favicon-32x32.png><link rel=apple-touch-icon href=https://tareqarnaout.github.io/asus-suspend-fix/apple-touch-icon.png><link rel=mask-icon href=https://tareqarnaout.github.io/asus-suspend-fix/safari-pinned-tab.svg><meta name=theme-color content="#2e2e33"><meta name=msapplication-TileColor content="#2e2e33"><link rel=alternate hreflang=en href=https://tareqarnaout.github.io/asus-suspend-fix/fan-fix/><noscript><style>#theme-toggle,.top-link{display:none}</style><style>@media(prefers-color-scheme:dark){:root{--theme:rgb(29, 30, 32);--entry:rgb(46, 46, 51);--primary:rgb(218, 218, 219);--secondary:rgb(155, 156, 157);--tertiary:rgb(65, 66, 68);--content:rgb(196, 196, 197);--code-block-bg:rgb(46, 46, 51);--code-bg:rgb(55, 56, 62);--border:rgb(51, 51, 51);color-scheme:dark}.list{background:var(--theme)}.toc{background:var(--entry)}}</style></noscript><script>localStorage.getItem("pref-theme")==="dark"?document.querySelector("html").dataset.theme="dark":localStorage.getItem("pref-theme")==="light"?document.querySelector("html").dataset.theme="light":window.matchMedia("(prefers-color-scheme: dark)").matches?document.querySelector("html").dataset.theme="dark":document.querySelector("html").dataset.theme="light"</script><meta property="og:url" content="https://tareqarnaout.github.io/asus-suspend-fix/fan-fix/"><meta property="og:site_name" content="Vivobook Linux Guides"><meta property="og:title" content="ASUS Vivobook Pro 15 — Linux Battery Fan & Performance Mode Fix"><meta property="og:description" content="Linux battery fan and performance profile troubleshooting for the ASUS Vivobook Pro 15."><meta property="og:locale" content="en"><meta property="og:type" content="article"><meta name=twitter:card content="summary"><meta name=twitter:title content="ASUS Vivobook Pro 15 — Linux Battery Fan & Performance Mode Fix"><meta name=twitter:description content="Linux battery fan and performance profile troubleshooting for the ASUS Vivobook Pro 15."><script type=application/ld+json>{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"ASUS Vivobook Pro 15 — Linux Battery Fan \u0026 Performance Mode Fix","item":"https://tareqarnaout.github.io/asus-suspend-fix/fan-fix/"}]}</script><script type=application/ld+json>{"@context":"https://schema.org","@type":"BlogPosting","headline":"ASUS Vivobook Pro 15 — Linux Battery Fan \u0026 Performance Mode Fix","name":"ASUS Vivobook Pro 15 — Linux Battery Fan \u0026 Performance Mode Fix","description":"Linux battery fan and performance profile troubleshooting for the ASUS Vivobook Pro 15.","keywords":[],"articleBody":" Field notes for the battery fan and performance profile issue. Package dependencies and asusctl commands can vary by release. The causes below describe the reported setup.\nIssue Summary When running Linux on battery power on the ASUS Vivobook Pro 15, the fans fail to spin up under heavy workloads even when the desktop power profile is set to Performance.\nReported causes WMI / EC Handshake Issue: Generic Linux power tools (power-profiles-daemon / TLP) do not always sync properly with the proprietary ASUS WMI/Embedded Controller (EC) interfaces when unplugged. asusd Default Battery Fallback: By default, asusctl sets the battery profile to Quiet, which forces the system into a low-power/silent state as soon as the charger is unplugged. powerprofilesctl Mapping Conflict: Running powerprofilesctl set performance while asusd is active triggers an inverted mapping bug that resets /sys/firmware/acpi/platform_profile to quiet. Step 1: Install Build Dependencies \u0026 gettext (Ubuntu / Zorin OS) Install the required compiler packages, development headers, and gettext (which provides msgfmt needed to compile translations for rog-control-center):\nsudo apt update sudo apt install make cargo gcc pkg-config openssl libasound2-dev cmake build-essential python3 libfreetype6-dev libexpat1-dev libxcb-composite0-dev libssl-dev libx11-dev libfontconfig1-dev curl libclang-dev libudev-dev checkinstall libseat-dev libinput-dev libxkbcommon-dev libgbm-dev git gettext (Optional) Ensure you have an up-to-date Rust toolchain via rustup:\ncurl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh source \"$HOME/.cargo/env\" Step 2: Clone, Build, and Install asusctl Clone the official repository, compile the binaries, and initialize the asusd service:\ngit clone https://github.com/OpenGamingCollective/asusctl.git cd asusctl make sudo make install Create the configuration directory and restart the daemon:\nsudo mkdir -p /etc/asusd sudo systemctl daemon-reload sudo systemctl restart asusd Step 3: Keep power-profiles-daemon Active (Do Not Mask) Do not mask power-profiles-daemon, as masking it removes the Power Mode slider from the GNOME / Zorin Quick Settings menu. If it was previously masked, restore it:\nsudo systemctl unmask power-profiles-daemon sudo systemctl enable --now power-profiles-daemon Step 4: Lock AC, Battery, and Active Profiles to Performance Set asusctl so that both AC and Battery states default to Performance, and set the currently active profile via asusctl (avoid using powerprofilesctl set performance so it does not reset to Quiet):\n# Set default AC and Battery profiles to Performance asusctl profile set Performance --battery asusctl profile set Performance --ac # Set the active profile to Performance asusctl profile set Performance Step 5: Verify Kernel \u0026 Profile Status Check asusctl state:\nasusctl profile get Expected output:\nActive profile: Performance AC profile Performance Battery profile Performance Verify the kernel ACPI platform profile:\ncat /sys/firmware/acpi/platform_profile Expected output:\nperformance Monitor temperatures and fan RPM under load:\nwatch -n 1 sensors Bonus: Fix rog-control-center Crash on X11 Sessions If launching rog-control-center fails with neither WAYLAND_DISPLAY nor WAYLAND_SOCKET is set, either switch to a Wayland session at login or recompile rog-control-center with X11 enabled:\ncd ~/asusctl cargo build --release --features \"rog-control-center/x11\" sudo make install ","wordCount":"468","inLanguage":"en","datePublished":"0001-01-01T00:00:00Z","dateModified":"0001-01-01T00:00:00Z","mainEntityOfPage":{"@type":"WebPage","@id":"https://tareqarnaout.github.io/asus-suspend-fix/fan-fix/"},"publisher":{"@type":"Organization","name":"Vivobook Linux Guides","logo":{"@type":"ImageObject","url":"https://tareqarnaout.github.io/asus-suspend-fix/favicon.ico"}}}</script></head><body id=top><header class=header><nav class=header-nav><div class=logo><a href=https://tareqarnaout.github.io/asus-suspend-fix/ accesskey=h title="Vivobook Linux Guides (Alt + H)">Vivobook Linux Guides</a><div class=logo-switches><button id=theme-toggle class=theme-toggle accesskey=t title="(Alt + T)" aria-label="Toggle theme">
+<svg class="moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+<svg class="sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button></div></div><ul id=menu class=menu><li><a href=https://tareqarnaout.github.io/asus-suspend-fix/ title="Fixing instant wake on an ASUS Vivobook Pro 15"><span>Suspend fix</span></a></li><li><a href=https://tareqarnaout.github.io/asus-suspend-fix/fan-fix/ title="ASUS Vivobook Pro 15 — Linux Battery Fan & Performance Mode Fix"><span class=active>Battery fan fix</span></a></li></ul></nav></header><main class=main><article class=post-single><header class=post-header><h1 class="post-title entry-hint-parent">ASUS Vivobook Pro 15 — Linux Battery Fan & Performance Mode Fix</h1><div class=post-description>Linux battery fan and performance profile troubleshooting for the ASUS Vivobook Pro 15.</div><div class=post-meta></div></header><div class="post-content md-content"><p class=meta>Field notes for the battery fan and performance profile issue. Package dependencies and <code>asusctl</code> commands can vary by release. The causes below describe the reported setup.</p><h2>Issue Summary</h2><p>When running Linux on battery power on the <strong>ASUS Vivobook Pro 15</strong>, the fans fail to spin up under heavy workloads even when the desktop power profile is set to <strong>Performance</strong>.</p><h3>Reported causes</h3><ol><li><strong>WMI / EC Handshake Issue:</strong> Generic Linux power tools (<code>power-profiles-daemon</code> / TLP) do not always sync properly with the proprietary ASUS WMI/Embedded Controller (EC) interfaces when unplugged.</li><li><strong><code>asusd</code> Default Battery Fallback:</strong> By default, <code>asusctl</code> sets the battery profile to <code>Quiet</code>, which forces the system into a low-power/silent state as soon as the charger is unplugged.</li><li><strong><code>powerprofilesctl</code> Mapping Conflict:</strong> Running <code>powerprofilesctl set performance</code> while <code>asusd</code> is active triggers an inverted mapping bug that resets <code>/sys/firmware/acpi/platform_profile</code> to <code>quiet</code>.</li></ol><hr><h2>Step 1: Install Build Dependencies & <code>gettext</code> (Ubuntu / Zorin OS)</h2><p>Install the required compiler packages, development headers, and <code>gettext</code> (which provides <code>msgfmt</code> needed to compile translations for <code>rog-control-center</code>):</p><pre><code class=language-bash>sudo apt update
 sudo apt install make cargo gcc pkg-config openssl libasound2-dev cmake build-essential python3 libfreetype6-dev libexpat1-dev libxcb-composite0-dev libssl-dev libx11-dev libfontconfig1-dev curl libclang-dev libudev-dev checkinstall libseat-dev libinput-dev libxkbcommon-dev libgbm-dev git gettext
-</code></pre>
-<p><em>(Optional)</em> Ensure you have an up-to-date Rust toolchain via <code>rustup</code>:</p>
-<pre><code class="language-bash">curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+</code></pre><p><em>(Optional)</em> Ensure you have an up-to-date Rust toolchain via <code>rustup</code>:</p><pre><code class=language-bash>curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source &quot;$HOME/.cargo/env&quot;
-</code></pre>
-<hr />
-<h2>Step 2: Clone, Build, and Install <code>asusctl</code></h2>
-<p>Clone the official repository, compile the binaries, and initialize the <code>asusd</code> service:</p>
-<pre><code class="language-bash">git clone https://github.com/OpenGamingCollective/asusctl.git
+</code></pre><hr><h2>Step 2: Clone, Build, and Install <code>asusctl</code></h2><p>Clone the official repository, compile the binaries, and initialize the <code>asusd</code> service:</p><pre><code class=language-bash>git clone https://github.com/OpenGamingCollective/asusctl.git
 cd asusctl
 make
 sudo make install
-</code></pre>
-<p>Create the configuration directory and restart the daemon:</p>
-<pre><code class="language-bash">sudo mkdir -p /etc/asusd
+</code></pre><p>Create the configuration directory and restart the daemon:</p><pre><code class=language-bash>sudo mkdir -p /etc/asusd
 sudo systemctl daemon-reload
 sudo systemctl restart asusd
-</code></pre>
-<hr />
-<h2>Step 3: Keep <code>power-profiles-daemon</code> Active (Do Not Mask)</h2>
-<p>Do <strong>not</strong> mask <code>power-profiles-daemon</code>, as masking it removes the Power Mode slider from the GNOME / Zorin Quick Settings menu. If it was previously masked, restore it:</p>
-<pre><code class="language-bash">sudo systemctl unmask power-profiles-daemon
+</code></pre><hr><h2>Step 3: Keep <code>power-profiles-daemon</code> Active (Do Not Mask)</h2><p>Do <strong>not</strong> mask <code>power-profiles-daemon</code>, as masking it removes the Power Mode slider from the GNOME / Zorin Quick Settings menu. If it was previously masked, restore it:</p><pre><code class=language-bash>sudo systemctl unmask power-profiles-daemon
 sudo systemctl enable --now power-profiles-daemon
-</code></pre>
-<hr />
-<h2>Step 4: Lock AC, Battery, and Active Profiles to <code>Performance</code></h2>
-<p>Set <code>asusctl</code> so that both AC and Battery states default to <code>Performance</code>, and set the currently active profile via <code>asusctl</code> (avoid using <code>powerprofilesctl set performance</code> so it does not reset to <code>Quiet</code>):</p>
-<pre><code class="language-bash"># Set default AC and Battery profiles to Performance
+</code></pre><hr><h2>Step 4: Lock AC, Battery, and Active Profiles to <code>Performance</code></h2><p>Set <code>asusctl</code> so that both AC and Battery states default to <code>Performance</code>, and set the currently active profile via <code>asusctl</code> (avoid using <code>powerprofilesctl set performance</code> so it does not reset to <code>Quiet</code>):</p><pre><code class=language-bash># Set default AC and Battery profiles to Performance
 asusctl profile set Performance --battery
 asusctl profile set Performance --ac
 
 # Set the active profile to Performance
 asusctl profile set Performance
-</code></pre>
-<hr />
-<h2>Step 5: Verify Kernel &amp; Profile Status</h2>
-<ol>
-<li>
-<p><strong>Check <code>asusctl</code> state:</strong></p>
-<pre><code class="language-bash">asusctl profile get
-</code></pre>
-<p>Expected output:</p>
-<pre><code class="language-text">Active profile: Performance
+</code></pre><hr><h2>Step 5: Verify Kernel & Profile Status</h2><ol><li><p><strong>Check <code>asusctl</code> state:</strong></p><pre><code class=language-bash>asusctl profile get
+</code></pre><p>Expected output:</p><pre><code class=language-text>Active profile: Performance
 
 AC profile Performance
 Battery profile Performance
-</code></pre>
-</li>
-<li>
-<p><strong>Verify the kernel ACPI platform profile:</strong></p>
-<pre><code class="language-bash">cat /sys/firmware/acpi/platform_profile
-</code></pre>
-<p>Expected output:</p>
-<pre><code class="language-text">performance
-</code></pre>
-</li>
-<li>
-<p><strong>Monitor temperatures and fan RPM under load:</strong></p>
-<pre><code class="language-bash">watch -n 1 sensors
-</code></pre>
-</li>
-</ol>
-<hr />
-<h2>Bonus: Fix <code>rog-control-center</code> Crash on X11 Sessions</h2>
-<p>If launching <code>rog-control-center</code> fails with <code>neither WAYLAND_DISPLAY nor WAYLAND_SOCKET is set</code>, either switch to a <strong>Wayland</strong> session at login or recompile <code>rog-control-center</code> with X11 enabled:</p>
-<pre><code class="language-bash">cd ~/asusctl
+</code></pre></li><li><p><strong>Verify the kernel ACPI platform profile:</strong></p><pre><code class=language-bash>cat /sys/firmware/acpi/platform_profile
+</code></pre><p>Expected output:</p><pre><code class=language-text>performance
+</code></pre></li><li><p><strong>Monitor temperatures and fan RPM under load:</strong></p><pre><code class=language-bash>watch -n 1 sensors
+</code></pre></li></ol><hr><h2>Bonus: Fix <code>rog-control-center</code> Crash on X11 Sessions</h2><p>If launching <code>rog-control-center</code> fails with <code>neither WAYLAND_DISPLAY nor WAYLAND_SOCKET is set</code>, either switch to a <strong>Wayland</strong> session at login or recompile <code>rog-control-center</code> with X11 enabled:</p><pre><code class=language-bash>cd ~/asusctl
 cargo build --release --features &quot;rog-control-center/x11&quot;
 sudo make install
-</code></pre>
-</main></body>
-</html>
+</code></pre></div><footer class=post-footer><ul class=post-tags></ul></footer></article></main><footer class=footer><span>&copy; 2026 <a href=https://tareqarnaout.github.io/asus-suspend-fix/>Vivobook Linux Guides</a></span> ·
+<span>Powered by
+<a href="https://gohugo.io/?utm_source=papermod" rel=noopener target=_blank>Hugo</a> &
+<a href=https://github.com/adityatelange/hugo-PaperMod/ rel=noopener target=_blank>PaperMod</a></span></footer><a href=#top id=top-link class="top-link hidden" aria-label="go to top" title="Go to Top (Alt + G)" accesskey=g><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevrons-up"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>
+</a><script>let menu=document.getElementById("menu");if(menu){const e=localStorage.getItem("menu-scroll-position");e&&(menu.scrollLeft=parseInt(e,10));let t;menu.addEventListener("scroll",function(){clearTimeout(t),t=setTimeout(function(){localStorage.setItem("menu-scroll-position",menu.scrollLeft)},150)},{passive:!0})}document.querySelectorAll('a[href^="#"]').forEach(e=>{e.addEventListener("click",function(e){e.preventDefault();var n=this.getAttribute("href").substr(1);const t=document.querySelector(`[id='${decodeURIComponent(n)}']`);window.matchMedia("(prefers-reduced-motion: reduce)").matches?t.scrollIntoView():t.scrollIntoView({behavior:"smooth"}),t.tabIndex<0&&!t.hasAttribute("tabindex")&&t.setAttribute("tabindex","-1"),t.focus({preventScroll:!0}),n==="top"?history.replaceState(null,null," "):history.pushState(null,null,`#${n}`)})})</script><script>var toplink=document.getElementById("top-link"),scrollTicking=!1;window.addEventListener("scroll",function(){if(scrollTicking)return;scrollTicking=!0,requestAnimationFrame(function(){const e=window.innerHeight,t=document.body.scrollTop>e||document.documentElement.scrollTop>e;toplink.classList.toggle("hidden",!t),scrollTicking=!1})},{passive:!0})</script><script>document.getElementById("theme-toggle").addEventListener("click",()=>{const e=document.querySelector("html");e.dataset.theme==="dark"?(e.dataset.theme="light",localStorage.setItem("pref-theme","light")):(e.dataset.theme="dark",localStorage.setItem("pref-theme","dark"))})</script><script>document.querySelectorAll("pre > code").forEach(e=>{const n=e.parentNode.parentNode,t=document.createElement("button");t.classList.add("copy-code"),t.innerHTML="copy";function s(){t.innerHTML="copied!",setTimeout(()=>{t.innerHTML="copy"},2e3)}t.addEventListener("click",t=>{if("clipboard"in navigator){navigator.clipboard.writeText(e.textContent),s();return}const n=document.createRange();n.selectNodeContents(e);const o=window.getSelection();o.removeAllRanges(),o.addRange(n);try{document.execCommand("copy"),s()}catch{}o.removeRange(n)}),n.classList.contains("highlight")?n.appendChild(t):n.parentNode.firstChild==n||(e.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName=="TABLE"?e.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(t):e.parentNode.appendChild(t))})</script></body></html>
