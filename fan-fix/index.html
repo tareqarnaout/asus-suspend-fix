@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Linux battery fan and performance profile troubleshooting for the ASUS Vivobook Pro 15.">
+<title>ASUS Vivobook Pro 15 Linux battery fan fix</title>
+<style>
+:root{color-scheme:dark;--bg:#10191d;--panel:#19272d;--text:#e9f2f3;--muted:#acc2c7;--accent:#9ce2bb}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:1rem/1.65 system-ui,sans-serif}main{width:min(48rem,calc(100% - 2.5rem));margin:auto;padding:3.5rem 0}header,section{margin-bottom:2.8rem}h1,h2{line-height:1.1;letter-spacing:-.025em}h1{font-size:clamp(2.4rem,7vw,4.2rem);margin:.55rem 0 1rem}h2{font-size:1.65rem;margin-bottom:.75rem}.tag{color:var(--accent);font:700 .82rem ui-monospace,monospace;letter-spacing:.12em}.meta,footer{color:var(--muted)}nav{display:flex;flex-wrap:wrap;gap:.4rem 1.1rem;margin:1.5rem 0}a{color:var(--accent);text-underline-offset:.2em}pre,.result{background:var(--panel);border:1px solid #3a5159;border-radius:.65rem;padding:1rem}pre{overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}code{font-family:ui-monospace,monospace;font-size:.92em}li+li{margin-top:.65rem}footer{border-top:1px solid #3a5159;padding-top:1rem}
+</style>
+<style>h1{font-size:clamp(2.2rem,6vw,3.6rem)}h2{margin-top:2.1rem}hr{border:0;border-top:1px solid #3a5159;margin:2rem 0}code{overflow-wrap:anywhere}</style>
+</head>
+<body><main>
+<nav aria-label="Related guides"><a href="../">← Suspend fix guide</a></nav>
+<p class="tag">LINUX TROUBLESHOOTING / FANS</p>
+<h1>ASUS Vivobook Pro 15 — Linux Battery Fan &amp; Performance Mode Fix</h1>
+<p class="meta">Field notes for the battery fan and performance profile issue. Package dependencies and <code>asusctl</code> commands can vary by release. The causes below describe the reported setup.</p>
+<h2>Issue Summary</h2>
+<p>When running Linux on battery power on the <strong>ASUS Vivobook Pro 15</strong>, the fans fail to spin up under heavy workloads even when the desktop power profile is set to <strong>Performance</strong>.</p>
+<h3>Reported causes</h3>
+<ol>
+<li><strong>WMI / EC Handshake Issue:</strong> Generic Linux power tools (<code>power-profiles-daemon</code> / TLP) do not always sync properly with the proprietary ASUS WMI/Embedded Controller (EC) interfaces when unplugged.</li>
+<li><strong><code>asusd</code> Default Battery Fallback:</strong> By default, <code>asusctl</code> sets the battery profile to <code>Quiet</code>, which forces the system into a low-power/silent state as soon as the charger is unplugged.</li>
+<li><strong><code>powerprofilesctl</code> Mapping Conflict:</strong> Running <code>powerprofilesctl set performance</code> while <code>asusd</code> is active triggers an inverted mapping bug that resets <code>/sys/firmware/acpi/platform_profile</code> to <code>quiet</code>.</li>
+</ol>
+<hr />
+<h2>Step 1: Install Build Dependencies &amp; <code>gettext</code> (Ubuntu / Zorin OS)</h2>
+<p>Install the required compiler packages, development headers, and <code>gettext</code> (which provides <code>msgfmt</code> needed to compile translations for <code>rog-control-center</code>):</p>
+<pre><code class="language-bash">sudo apt update
+sudo apt install make cargo gcc pkg-config openssl libasound2-dev cmake build-essential python3 libfreetype6-dev libexpat1-dev libxcb-composite0-dev libssl-dev libx11-dev libfontconfig1-dev curl libclang-dev libudev-dev checkinstall libseat-dev libinput-dev libxkbcommon-dev libgbm-dev git gettext
+</code></pre>
+<p><em>(Optional)</em> Ensure you have an up-to-date Rust toolchain via <code>rustup</code>:</p>
+<pre><code class="language-bash">curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source &quot;$HOME/.cargo/env&quot;
+</code></pre>
+<hr />
+<h2>Step 2: Clone, Build, and Install <code>asusctl</code></h2>
+<p>Clone the official repository, compile the binaries, and initialize the <code>asusd</code> service:</p>
+<pre><code class="language-bash">git clone https://github.com/OpenGamingCollective/asusctl.git
+cd asusctl
+make
+sudo make install
+</code></pre>
+<p>Create the configuration directory and restart the daemon:</p>
+<pre><code class="language-bash">sudo mkdir -p /etc/asusd
+sudo systemctl daemon-reload
+sudo systemctl restart asusd
+</code></pre>
+<hr />
+<h2>Step 3: Keep <code>power-profiles-daemon</code> Active (Do Not Mask)</h2>
+<p>Do <strong>not</strong> mask <code>power-profiles-daemon</code>, as masking it removes the Power Mode slider from the GNOME / Zorin Quick Settings menu. If it was previously masked, restore it:</p>
+<pre><code class="language-bash">sudo systemctl unmask power-profiles-daemon
+sudo systemctl enable --now power-profiles-daemon
+</code></pre>
+<hr />
+<h2>Step 4: Lock AC, Battery, and Active Profiles to <code>Performance</code></h2>
+<p>Set <code>asusctl</code> so that both AC and Battery states default to <code>Performance</code>, and set the currently active profile via <code>asusctl</code> (avoid using <code>powerprofilesctl set performance</code> so it does not reset to <code>Quiet</code>):</p>
+<pre><code class="language-bash"># Set default AC and Battery profiles to Performance
+asusctl profile set Performance --battery
+asusctl profile set Performance --ac
+
+# Set the active profile to Performance
+asusctl profile set Performance
+</code></pre>
+<hr />
+<h2>Step 5: Verify Kernel &amp; Profile Status</h2>
+<ol>
+<li>
+<p><strong>Check <code>asusctl</code> state:</strong></p>
+<pre><code class="language-bash">asusctl profile get
+</code></pre>
+<p>Expected output:</p>
+<pre><code class="language-text">Active profile: Performance
+
+AC profile Performance
+Battery profile Performance
+</code></pre>
+</li>
+<li>
+<p><strong>Verify the kernel ACPI platform profile:</strong></p>
+<pre><code class="language-bash">cat /sys/firmware/acpi/platform_profile
+</code></pre>
+<p>Expected output:</p>
+<pre><code class="language-text">performance
+</code></pre>
+</li>
+<li>
+<p><strong>Monitor temperatures and fan RPM under load:</strong></p>
+<pre><code class="language-bash">watch -n 1 sensors
+</code></pre>
+</li>
+</ol>
+<hr />
+<h2>Bonus: Fix <code>rog-control-center</code> Crash on X11 Sessions</h2>
+<p>If launching <code>rog-control-center</code> fails with <code>neither WAYLAND_DISPLAY nor WAYLAND_SOCKET is set</code>, either switch to a <strong>Wayland</strong> session at login or recompile <code>rog-control-center</code> with X11 enabled:</p>
+<pre><code class="language-bash">cd ~/asusctl
+cargo build --release --features &quot;rog-control-center/x11&quot;
+sudo make install
+</code></pre>
+</main></body>
+</html>
